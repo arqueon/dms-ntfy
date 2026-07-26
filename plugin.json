@@ -1,0 +1,39 @@
+{
+    "id": "ntfy",
+    "name": "ntfy",
+    "description": "Persistent ntfy inbox for the DankBar with an All view, per-topic sections, unread state, search, links, attachments, and local dismissal",
+    "version": "0.1.0",
+    "author": "arqueon",
+    "icon": "notifications",
+    "type": "composite",
+    "category": "productivity",
+    "capabilities": [
+        "daemon",
+        "dankbar-widget",
+        "ipc"
+    ],
+    "components": {
+        "daemon": "./NtfyDaemon.qml",
+        "widget": "./NtfyWidget.qml"
+    },
+    "settings": "./Settings.qml",
+    "startupCheck": "./StartupCheck.qml",
+    "requires_dms": ">=1.5.0",
+    "distro": [
+        "any"
+    ],
+    "compositors": [
+        "any"
+    ],
+    "dependencies": [
+        "curl",
+        "secret-tool",
+        "base64"
+    ],
+    "permissions": [
+        "settings_read",
+        "settings_write",
+        "network",
+        "process"
+    ]
+}
