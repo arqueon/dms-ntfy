@@ -9,7 +9,7 @@ Item {
 
     property int size: 20
     property color iconColor: Theme.surfaceText
-    property real iconOpacity: 1.0
+    property real iconOpacity: 0.9
 
     width: size
     height: size
@@ -30,6 +30,10 @@ Item {
             saturation: 0
             colorization: 1
             colorizationColor: root.iconColor
+            // The upstream SVG is authored in #777. Normalize it to white
+            // before tinting so Theme.surfaceText lands at the same luminance
+            // as DMS's monochrome icons.
+            brightness: 1
         }
     }
 }

@@ -260,7 +260,8 @@ PluginComponent {
                     iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return Theme.surfaceText
+                        return root.unreadCount > 0
+                            ? Theme.primary : Theme.surfaceText
                     }
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -304,7 +305,8 @@ PluginComponent {
                     iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return Theme.surfaceText
+                        return root.unreadCount > 0
+                            ? Theme.primary : Theme.surfaceText
                     }
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
@@ -342,7 +344,7 @@ PluginComponent {
         PopoutComponent {
             id: popout
 
-            headerText: "ntfy"
+            headerText: "dms-ntfy"
             detailsText: root.headerDetails
             showCloseButton: true
 

@@ -1,6 +1,6 @@
 {
     "id": "ntfy",
-    "name": "ntfy",
+    "name": "dms-ntfy",
     "description": "Persistent ntfy inbox for the DankBar with an All view, per-topic sections, unread state, search, links, attachments, and local dismissal",
     "version": "0.1.0",
     "author": "arqueon",

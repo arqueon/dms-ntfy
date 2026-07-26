@@ -16,7 +16,7 @@ QtObject {
                     return
                 }
                 done({
-                    "title": "Missing dependencies for the ntfy plugin",
+                    "title": "Missing dependencies for dms-ntfy",
                     "details": "'curl', 'secret-tool' (libsecret), and 'base64' are required on PATH. Install them and re-enable this plugin."
                 })
             }

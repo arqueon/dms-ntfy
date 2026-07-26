@@ -1,4 +1,4 @@
-# DMS ntfy
+# dms-ntfy
 
 A persistent [ntfy](https://ntfy.sh) review inbox for
 [DankMaterialShell](https://danklinux.com).
