@@ -19,6 +19,11 @@ archive later.
   (unless you opt into a history limit).
 - Read/unread state, per-topic unread counters, full-text local search, manual
   refresh, mark-all-read, and two-step dismissal.
+- Multi-select with checkboxes: select notifications one by one or all in the
+  current view, then mark them read/unread or dismiss them in a single batch
+  (dismissal asks for a confirming second click).
+- The popout title is a link: click **dms-ntfy** to open the configured
+  instance in your browser.
 - Shows ntfy title, body, topic, priority, tags, source instance, exact timestamp,
   click URL, attachment, and safe `view` actions.
 - HTTP and broadcast actions are described but never executed.
@@ -70,8 +75,10 @@ dms ipc call ntfy markAllRead __all__
 ```
 
 Mutation commands used by the UI (`markRead`, `markUnread`, `dismiss`,
-`dismissRead`, and `clearHistory`) are also available over IPC. Dismissal is local:
-it does not delete the original message from the ntfy server.
+`dismissRead`, and `clearHistory`) are also available over IPC, as are the batch
+variants (`markReadMany`, `markUnreadMany`, `dismissMany`) that take a
+newline-separated list of message uids. Dismissal is local: it does not delete
+the original message from the ntfy server.
 
 ## Development
 
@@ -82,7 +89,10 @@ dms ipc plugin-scan rescan ntfy
 dms ipc plugin-scan reload ntfy
 ```
 
-Because QML caches imported JavaScript, restart DMS after changing `JS/ntfy.js`.
+Because the QML engine caches compiled components and imported JavaScript for
+the lifetime of the process, `plugin-scan reload` is not enough to pick up code
+changes in practice — restart the shell (`systemctl --user restart dms`) after
+editing any `.qml` or `.js` file.
 
 ## Licensing
 

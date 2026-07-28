@@ -199,6 +199,63 @@ PluginComponent {
         return changed
     }
 
+    function _uidSet(uidList) {
+        var parts = String(uidList || "").split("\n")
+        var wanted = {}
+        for (var i = 0; i < parts.length; i++) {
+            var uid = parts[i].trim()
+            if (uid !== "")
+                wanted[uid] = true
+        }
+        return wanted
+    }
+
+    function setReadMany(uidList, readValue) {
+        var wanted = _uidSet(uidList)
+        var changed = 0
+        var next = []
+        for (var i = 0; i < messages.length; i++) {
+            var message = messages[i]
+            if (wanted[message.uid] && message.read !== readValue) {
+                next.push(Object.assign({}, message, { read: readValue }))
+                changed++
+            } else {
+                next.push(message)
+            }
+        }
+        if (changed > 0) {
+            messages = next
+            persistArchive()
+            publishRuntime()
+        }
+        return changed
+    }
+
+    function dismissMany(uidList) {
+        var wanted = _uidSet(uidList)
+        var removed = []
+        var kept = []
+        for (var i = 0; i < messages.length; i++) {
+            var message = messages[i]
+            if (wanted[message.uid])
+                removed.push(message.uid)
+            else
+                kept.push(message)
+        }
+        if (removed.length === 0)
+            return 0
+        messages = kept
+        var tombstones = dismissedUids.slice()
+        for (var j = 0; j < removed.length; j++) {
+            if (tombstones.indexOf(removed[j]) === -1)
+                tombstones.push(removed[j])
+        }
+        dismissedUids = tombstones
+        persistArchive()
+        publishRuntime()
+        return removed.length
+    }
+
     function markAllRead(topic) {
         var selectedTopic = String(topic || "__all__")
         var changed = false
@@ -292,6 +349,18 @@ PluginComponent {
 
         function markUnread(uid: string): string {
             return root.setRead(uid, false) ? "MARKED_UNREAD" : "NOT_FOUND_OR_UNCHANGED"
+        }
+
+        function markReadMany(uids: string): string {
+            return "MARKED_READ=" + root.setReadMany(uids, true)
+        }
+
+        function markUnreadMany(uids: string): string {
+            return "MARKED_UNREAD=" + root.setReadMany(uids, false)
+        }
+
+        function dismissMany(uids: string): string {
+            return "DISMISSED=" + root.dismissMany(uids)
         }
 
         function markAllRead(topic: string): string {

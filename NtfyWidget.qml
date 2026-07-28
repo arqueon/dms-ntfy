@@ -24,6 +24,7 @@ PluginComponent {
     readonly property bool isLoading: loadingGlobal.value === true
     readonly property string errorMessage: String(errorGlobal.value || "")
     readonly property double lastUpdated: parseInt(updatedGlobal.value) || 0
+    readonly property string instanceUrl: Ntfy.normalizeBaseUrl(pluginData.baseUrl || "https://ntfy.sh")
 
     property string activeTopic: "__all__"
     property string searchQuery: ""
@@ -31,6 +32,30 @@ PluginComponent {
     property string expandedUid: ""
     property string pendingDismissUid: ""
     property bool pendingDismissRead: false
+    property var selectedUids: ({})
+    readonly property int selectedCount: Object.keys(selectedUids).length
+    property bool batchDismissArmed: false
+
+    onMessagesChanged: {
+        if (selectedCount === 0)
+            return
+        var present = {}
+        for (var i = 0; i < messages.length; i++)
+            present[messages[i].uid] = true
+        var next = {}
+        var removed = false
+        for (var uid in selectedUids) {
+            if (present[uid])
+                next[uid] = true
+            else
+                removed = true
+        }
+        if (removed) {
+            selectedUids = next
+            if (Object.keys(next).length === 0)
+                batchDismissArmed = false
+        }
+    }
 
     readonly property var topicOptions: {
         var options = [{ value: "__all__", label: "All" }]
@@ -208,6 +233,57 @@ PluginComponent {
         expandedUid = expandedUid === message.uid ? "" : message.uid
     }
 
+    function isSelected(uid) {
+        return selectedUids[uid] === true
+    }
+
+    function toggleSelect(uid) {
+        var next = Object.assign({}, selectedUids)
+        if (next[uid])
+            delete next[uid]
+        else
+            next[uid] = true
+        selectedUids = next
+        if (selectedCount === 0)
+            batchDismissArmed = false
+    }
+
+    function selectAllVisible() {
+        var next = Object.assign({}, selectedUids)
+        for (var i = 0; i < filteredMessages.length; i++)
+            next[filteredMessages[i].uid] = true
+        selectedUids = next
+    }
+
+    function clearSelection() {
+        selectedUids = {}
+        batchDismissArmed = false
+    }
+
+    function batchSetRead(readValue) {
+        var uids = Object.keys(selectedUids)
+        if (uids.length === 0)
+            return
+        callDaemon(readValue ? "markReadMany" : "markUnreadMany",
+                   [uids.join("\n")])
+        clearSelection()
+    }
+
+    function requestBatchDismiss() {
+        var uids = Object.keys(selectedUids)
+        if (uids.length === 0)
+            return
+        if (!batchDismissArmed) {
+            batchDismissArmed = true
+            batchDismissConfirmTimer.restart()
+            return
+        }
+        batchDismissConfirmTimer.stop()
+        batchDismissArmed = false
+        callDaemon("dismissMany", [uids.join("\n")])
+        clearSelection()
+    }
+
     function openUrl(url) {
         var target = String(url || "").trim()
         if (target !== "")
@@ -235,6 +311,13 @@ PluginComponent {
         interval: 3500
         repeat: false
         onTriggered: root.pendingDismissRead = false
+    }
+
+    Timer {
+        id: batchDismissConfirmTimer
+        interval: 3500
+        repeat: false
+        onTriggered: root.batchDismissArmed = false
     }
 
     Timer {
@@ -344,13 +427,102 @@ PluginComponent {
         PopoutComponent {
             id: popout
 
-            headerText: "dms-ntfy"
-            detailsText: root.headerDetails
-            showCloseButton: true
+            // Header and details are rendered as custom content below so the
+            // title can act as a link to the configured ntfy instance.
+            headerText: ""
+            detailsText: ""
+            showCloseButton: false
 
             Component.onCompleted: {
                 if (root.configured && Date.now() - root.lastUpdated > 60000)
                     root.refresh()
+            }
+
+            // Custom header: clickable title that opens the configured ntfy
+            // instance in the browser, plus a close button matching the one
+            // PopoutComponent normally provides.
+            Item {
+                id: customHeader
+                width: parent.width
+                height: 40
+
+                StyledText {
+                    id: headerTitle
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "dms-ntfy"
+                    font.pixelSize: Theme.fontSizeLarge + 4
+                    font.weight: Font.Bold
+                    color: headerTitleMouse.containsMouse
+                           ? Theme.primary
+                           : Theme.surfaceText
+                }
+
+                DankIcon {
+                    anchors.left: headerTitle.right
+                    anchors.leftMargin: Theme.spacingXS
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "open_in_new"
+                    size: 16
+                    color: Theme.primary
+                    visible: headerTitleMouse.containsMouse
+                }
+
+                MouseArea {
+                    id: headerTitleMouse
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: Theme.spacingS + headerTitle.implicitWidth
+                           + Theme.spacingXS + 22
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    enabled: root.instanceUrl !== ""
+                    onClicked: root.openUrl(root.instanceUrl)
+                }
+
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 32
+                    height: 32
+                    radius: 16
+                    color: closeArea.containsMouse
+                           ? Theme.errorHover
+                           : Theme.withAlpha(Theme.errorHover, 0)
+
+                    DankIcon {
+                        anchors.centerIn: parent
+                        name: "close"
+                        size: Theme.iconSize - 4
+                        color: closeArea.containsMouse
+                               ? Theme.error
+                               : Theme.surfaceText
+                    }
+
+                    MouseArea {
+                        id: closeArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onPressed: {
+                            if (popout.closePopout)
+                                popout.closePopout()
+                        }
+                    }
+                }
+            }
+
+            StyledText {
+                id: customDetails
+                width: parent.width
+                leftPadding: Theme.spacingS
+                bottomPadding: Theme.spacingS
+                text: root.headerDetails
+                font.pixelSize: Theme.fontSizeMedium
+                color: Theme.surfaceVariantText
+                wrapMode: Text.WordWrap
             }
 
             // Search and archive actions.
@@ -441,13 +613,98 @@ PluginComponent {
                 }
             }
 
+            // Batch-selection bar, shown while any notification is checked.
+            Item {
+                id: selectionRow
+                width: parent.width
+                height: root.selectedCount > 0 ? 34 : 0
+                visible: root.selectedCount > 0
+                clip: true
+
+                Rectangle {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.spacingS
+                    anchors.rightMargin: Theme.spacingS
+                    radius: Theme.cornerRadius
+                    color: Theme.withAlpha(Theme.primary, 0.12)
+
+                    Row {
+                        anchors.left: parent.left
+                        anchors.leftMargin: Theme.spacingS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.spacingXS
+
+                        StyledText {
+                            text: root.selectedCount + " selected"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.DemiBold
+                            color: Theme.primary
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        DankActionButton {
+                            iconName: "select_all"
+                            buttonSize: 26
+                            iconColor: Theme.surfaceVariantText
+                            tooltipText: "Select all in view"
+                            onClicked: root.selectAllVisible()
+                        }
+
+                        DankActionButton {
+                            iconName: "close"
+                            buttonSize: 26
+                            iconColor: Theme.surfaceVariantText
+                            tooltipText: "Clear selection"
+                            onClicked: root.clearSelection()
+                        }
+                    }
+
+                    Row {
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.spacingXS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 0
+
+                        DankActionButton {
+                            iconName: "done_all"
+                            buttonSize: 26
+                            iconColor: Theme.surfaceVariantText
+                            tooltipText: "Mark selected as read"
+                            onClicked: root.batchSetRead(true)
+                        }
+
+                        DankActionButton {
+                            iconName: "mark_email_unread"
+                            buttonSize: 26
+                            iconColor: Theme.surfaceVariantText
+                            tooltipText: "Mark selected as unread"
+                            onClicked: root.batchSetRead(false)
+                        }
+
+                        DankActionButton {
+                            iconName: root.batchDismissArmed
+                                      ? "delete_forever" : "delete"
+                            buttonSize: 26
+                            iconColor: root.batchDismissArmed
+                                       ? Theme.error : Theme.surfaceVariantText
+                            tooltipText: root.batchDismissArmed
+                                         ? "Click again: dismiss "
+                                           + root.selectedCount + " notifications"
+                                         : "Dismiss selected"
+                            onClicked: root.requestBatchDismiss()
+                        }
+                    }
+                }
+            }
+
             Item {
                 id: archiveArea
                 width: parent.width
                 height: Math.max(
                     180,
-                    root.popoutHeight - popout.headerHeight
-                    - popout.detailsHeight - toolbar.height - Theme.spacingXL * 2
+                    root.popoutHeight - customHeader.height
+                    - customDetails.height - toolbar.height
+                    - selectionRow.height - Theme.spacingXL * 2
                 )
 
                 Rectangle {
@@ -559,6 +816,7 @@ PluginComponent {
                                     root.expandedUid = ""
                                     root.pendingDismissUid = ""
                                     root.pendingDismissRead = false
+                                    root.clearSelection()
                                 }
                             }
                         }
@@ -609,9 +867,16 @@ PluginComponent {
 
                             MouseArea {
                                 anchors.fill: parent
-                                onClicked: root.toggleExpanded(
-                                    notificationCard.modelData
-                                )
+                                onClicked: {
+                                    if (root.selectedCount > 0)
+                                        root.toggleSelect(
+                                            notificationCard.modelData.uid
+                                        )
+                                    else
+                                        root.toggleExpanded(
+                                            notificationCard.modelData
+                                        )
+                                }
                             }
 
                             Column {
@@ -625,6 +890,36 @@ PluginComponent {
                                 Row {
                                     width: parent.width
                                     spacing: Theme.spacingXS
+
+                                    Item {
+                                        width: 20
+                                        height: 34
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        DankIcon {
+                                            anchors.centerIn: parent
+                                            name: root.isSelected(
+                                                      notificationCard.modelData.uid
+                                                  )
+                                                  ? "check_box"
+                                                  : "check_box_outline_blank"
+                                            size: 18
+                                            color: root.isSelected(
+                                                       notificationCard.modelData.uid
+                                                   )
+                                                   ? Theme.primary
+                                                   : Theme.surfaceVariantText
+                                        }
+
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            anchors.margins: -4
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: root.toggleSelect(
+                                                notificationCard.modelData.uid
+                                            )
+                                        }
+                                    }
 
                                     Rectangle {
                                         width: 4
@@ -679,8 +974,9 @@ PluginComponent {
                                             - parent.children[0].width
                                             - parent.children[1].width
                                             - parent.children[2].width
+                                            - parent.children[3].width
                                             - cardActions.width
-                                            - Theme.spacingXS * 5
+                                            - Theme.spacingXS * 6
                                         )
                                         text: Ntfy.relativeTime(
                                             notificationCard.modelData.time
