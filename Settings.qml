@@ -15,6 +15,40 @@ PluginSettings {
     property bool tokenStored: false
     property bool passwordStored: false
 
+    // "", "saving", "ok" or "error" — drives the inline feedback line under each field.
+    property string tokenSaveStatus: ""
+    property string passwordSaveStatus: ""
+
+    function secretStatusText(status) {
+        if (status === "saving")
+            return "Saving…"
+        if (status === "ok")
+            return "✓ Saved to keyring"
+        if (status === "error")
+            return "✗ Not saved — empty value, busy, or the keyring refused it"
+        return ""
+    }
+
+    function secretStatusColor(status) {
+        if (status === "ok")
+            return Theme.primary
+        if (status === "error")
+            return Theme.error
+        return Theme.surfaceVariantText
+    }
+
+    Timer {
+        id: tokenStatusClear
+        interval: 4000
+        onTriggered: root.tokenSaveStatus = ""
+    }
+
+    Timer {
+        id: passwordStatusClear
+        interval: 4000
+        onTriggered: root.passwordSaveStatus = ""
+    }
+
     function checkSecret(key, callback) {
         Proc.runCommand(
             "ntfy.settings.check." + key,
@@ -38,6 +72,7 @@ PluginSettings {
         secretStoreProcess.pendingKey = key
         secretStoreProcess.pendingSecret = trimmed
         secretStoreProcess.pendingCallback = callback
+        secretStoreProcess.stdinEnabled = true
         secretStoreProcess.running = true
     }
 
@@ -58,8 +93,11 @@ PluginSettings {
         running: false
 
         onStarted: {
-            write(pendingSecret + "\n")
+            write(pendingSecret)
             pendingSecret = ""
+            // secret-tool reads the secret until EOF; without closing stdin it
+            // waits forever, the process never exits and nothing gets stored.
+            stdinEnabled = false
         }
 
         onExited: function(exitCode) {
@@ -196,14 +234,29 @@ PluginSettings {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.storeSecret("token", tokenField.text, ok => {
-                        if (ok) {
-                            root.tokenStored = true
-                            tokenField.text = ""
-                        }
-                    })
+                    onClicked: {
+                        tokenStatusClear.stop()
+                        root.tokenSaveStatus = "saving"
+                        root.storeSecret("token", tokenField.text, ok => {
+                            root.tokenSaveStatus = ok ? "ok" : "error"
+                            tokenStatusClear.restart()
+                            if (ok) {
+                                root.tokenStored = true
+                                tokenField.text = ""
+                            }
+                        })
+                    }
                 }
             }
+        }
+
+        StyledText {
+            visible: root.tokenSaveStatus !== ""
+            width: parent.width
+            text: root.secretStatusText(root.tokenSaveStatus)
+            font.pixelSize: Theme.fontSizeSmall
+            color: root.secretStatusColor(root.tokenSaveStatus)
+            wrapMode: Text.WordWrap
         }
     }
 
@@ -251,18 +304,29 @@ PluginSettings {
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.storeSecret(
-                        "password",
-                        passwordField.text,
-                        ok => {
+                    onClicked: {
+                        passwordStatusClear.stop()
+                        root.passwordSaveStatus = "saving"
+                        root.storeSecret("password", passwordField.text, ok => {
+                            root.passwordSaveStatus = ok ? "ok" : "error"
+                            passwordStatusClear.restart()
                             if (ok) {
                                 root.passwordStored = true
                                 passwordField.text = ""
                             }
-                        }
-                    )
+                        })
+                    }
                 }
             }
+        }
+
+        StyledText {
+            visible: root.passwordSaveStatus !== ""
+            width: parent.width
+            text: root.secretStatusText(root.passwordSaveStatus)
+            font.pixelSize: Theme.fontSizeSmall
+            color: root.secretStatusColor(root.passwordSaveStatus)
+            wrapMode: Text.WordWrap
         }
     }
 
