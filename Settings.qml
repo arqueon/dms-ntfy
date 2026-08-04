@@ -146,6 +146,14 @@ PluginSettings {
                 _setDiscovered(instance.id, {
                     status: "ok", error: "", topics: topics
                 })
+                // First discovery on a fresh instance: select everything the
+                // account can see, so fetching is enough to go live and the
+                // chips are for pruning. A non-empty list is a curated choice
+                // we must not override.
+                var current = instances[index]
+                if (topics.length > 0 && current && current.id === instance.id
+                        && Ntfy.toArray(current.topics).length === 0)
+                    updateInstance(index, { topics: topics })
             }
         )
     }
