@@ -27,10 +27,15 @@ archive later.
 - Shows ntfy title, body, topic, priority, tags, source instance, exact timestamp,
   click URL, attachment, and safe `view` actions.
 - HTTP and broadcast actions are described but never executed.
+- **Multiple servers**: subscribe to any number of ntfy instances at once, each
+  with its own topics and credentials. Messages from every server merge into the
+  same archive and topic sections; each card shows its source instance.
 - Works with ntfy.sh or any self-hosted instance, public topics, access tokens, or
-  HTTP Basic authentication.
-- Credentials are stored in the system keyring with `secret-tool`, never in
-  `plugin_settings.json`.
+  HTTP Basic authentication — chosen per server.
+- Credentials are stored in the system keyring with `secret-tool` (one entry per
+  server: key `token:<id>` or `password:<id>`), never in `plugin_settings.json`.
+  Configurations from versions before 0.3.0 migrate automatically into a single
+  server that keeps reading the original keyring entries.
 - Composite architecture: one daemon owns polling and persistence while any
   number of horizontal/vertical widget instances share its live state.
 
@@ -55,14 +60,19 @@ archive.
    dms ipc plugin-scan scan
    ```
 
-3. In Settings → Plugins → ntfy, set the instance URL and comma-separated topics.
-4. Select the authentication method. Save an access token or password through the
-   settings UI; alternatively:
+3. In Settings → Plugins → ntfy, add one card per server: URL, comma-separated
+   topics, and the authentication method for that server.
+4. Save each server's access token or password through the settings UI;
+   alternatively, store it directly under that server's keyring key:
 
    ```sh
-   secret-tool store --label='DMS ntfy token' service dms-ntfy key token
-   secret-tool store --label='DMS ntfy password' service dms-ntfy key password
+   secret-tool store --label='DMS ntfy token' service dms-ntfy key token:<id>
+   secret-tool store --label='DMS ntfy password' service dms-ntfy key password:<id>
    ```
+
+   The `<id>` of each server is visible in the `instances` entry of
+   `plugin_settings.json` (a configuration migrated from 0.2.x keeps the id
+   `main` and continues to read the original `token`/`password` keys).
 
 Right-clicking the bar icon syncs immediately. Left-clicking opens the archive.
 

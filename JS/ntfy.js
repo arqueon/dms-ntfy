@@ -54,6 +54,103 @@ function parseTopics(value) {
     return topics
 }
 
+function parseInstances(data) {
+    var source = data || {}
+    var raw = source.instances
+    if (typeof raw === "string" && raw.trim() !== "") {
+        try {
+            raw = JSON.parse(raw)
+        } catch (error) {
+            raw = []
+        }
+    }
+    var list = []
+    var seen = {}
+    var candidates = toArray(raw)
+    for (var i = 0; i < candidates.length; i++) {
+        var item = candidates[i]
+        if (!item || typeof item !== "object")
+            continue
+        var id = String(item.id || "").trim()
+        var baseUrl = normalizeBaseUrl(item.baseUrl || "")
+        if (id === "" || baseUrl === "" || seen[id])
+            continue
+        seen[id] = true
+        list.push({
+            id: id,
+            baseUrl: baseUrl,
+            topics: parseTopics(item.topics),
+            authMethod: String(item.authMethod || "none"),
+            username: String(item.username || "").trim(),
+            legacySecrets: item.legacySecrets === true
+        })
+    }
+    if (list.length > 0)
+        return list
+
+    // Settings written before multi-instance support carry the server at the
+    // top level. They become one migrated instance that keeps reading the
+    // original un-namespaced keyring entries, so stored secrets keep working.
+    var legacyUrl = normalizeBaseUrl(source.baseUrl || "")
+    var legacyTopics = parseTopics(source.topics)
+    if (legacyUrl === "" || legacyTopics.length === 0)
+        return []
+    return [{
+        id: "main",
+        baseUrl: legacyUrl,
+        topics: legacyTopics,
+        authMethod: String(source.authMethod || "none"),
+        username: String(source.username || "").trim(),
+        legacySecrets: true
+    }]
+}
+
+function instanceConfigured(instance) {
+    return !!instance
+           && instance.baseUrl !== ""
+           && instance.topics.length > 0
+           && (instance.authMethod !== "basic" || instance.username !== "")
+}
+
+function secretKeys(instance, kind) {
+    if (!instance)
+        return []
+    var keys = [kind + ":" + instance.id]
+    if (instance.legacySecrets)
+        keys.push(kind)
+    return keys
+}
+
+function instancesContextKey(instances) {
+    var parts = []
+    var list = toArray(instances)
+    for (var i = 0; i < list.length; i++) {
+        var instance = list[i]
+        parts.push(instance.id + "|" + instance.baseUrl + "|"
+                   + instance.topics.join(","))
+    }
+    return parts.join("&&")
+}
+
+function instancesTopics(instances) {
+    var merged = []
+    var list = toArray(instances)
+    for (var i = 0; i < list.length; i++)
+        merged = merged.concat(list[i].topics)
+    return parseTopics(merged)
+}
+
+function combineErrors(errorsById, instances) {
+    var list = toArray(instances)
+    var parts = []
+    for (var i = 0; i < list.length; i++) {
+        var message = errorsById ? errorsById[list[i].id] : null
+        if (message)
+            parts.push(sourceHost(list[i].baseUrl) + ": " + message)
+    }
+    return parts.join(" · ")
+}
+
 function subscriptionUrl(baseUrl, topics, since) {
     var root = normalizeBaseUrl(baseUrl)
     var parsed = parseTopics(topics)
@@ -311,6 +408,19 @@ function matchesSearch(message, query) {
 function sourceHost(url) {
     var match = String(url || "").match(/^https?:\/\/([^\/:?#]+)(?::\d+)?/i)
     return match ? match[1] : String(url || "")
+}
+
+// Compact per-card label for a server: drops a generic notification prefix
+// (ntfy./notify./push.) when a meaningful name remains, then keeps the first
+// label. "notify.example.org" -> "example", but "ntfy.sh" stays "ntfy.sh".
+function sourceLabel(url) {
+    var host = sourceHost(url)
+    var labels = host.split(".")
+    if (labels.length >= 3 && /^(ntfy|notify|push)$/i.test(labels[0]))
+        labels = labels.slice(1)
+    if (labels.length < 2 || /^(ntfy|notify|push)$/i.test(labels[0]))
+        return host
+    return labels[0]
 }
 
 function titleOf(message) {

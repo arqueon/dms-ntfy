@@ -14,50 +14,55 @@ PluginComponent {
 
     property var popoutService: null
 
-    // Settings (PluginComponent.pluginData is reactive).
-    property string baseUrl: Ntfy.normalizeBaseUrl(pluginData.baseUrl || "https://ntfy.sh")
-    property string rawTopics: String(pluginData.topics || "")
-    property var configuredTopics: Ntfy.parseTopics(rawTopics)
-    property string topicsKey: configuredTopics.join(",")
-    property string authMethod: String(pluginData.authMethod || "none")
-    property string username: String(pluginData.username || "").trim()
+    // Settings (PluginComponent.pluginData is reactive). Legacy single-server
+    // settings are folded into a one-element instance list by parseInstances.
+    property var instances: Ntfy.parseInstances(pluginData)
+    property var configuredTopics: Ntfy.instancesTopics(instances)
     property int pollIntervalMs: Math.max(15, parseInt(pluginData.pollInterval) || 60) * 1000
     property int historyLimit: Math.max(0, parseInt(pluginData.historyLimit) || 0)
     property string secretsStamp: String(pluginData.secretsStamp || "")
 
-    readonly property string contextKey: baseUrl + "|" + topicsKey
-    readonly property bool configured: baseUrl !== ""
-                                       && configuredTopics.length > 0
-                                       && (authMethod !== "basic" || username !== "")
+    readonly property string contextKey: Ntfy.instancesContextKey(instances)
+    readonly property bool configured: instances.some(Ntfy.instanceConfigured)
 
-    // Persistent archive state.
+    // Persistent archive state. cursors maps instance id to its own
+    // { cursor, context } pair so each server resumes where it left off.
     property var messages: []
     property var dismissedUids: []
-    property string cursor: ""
-    property string cursorContext: ""
+    property var cursors: ({})
     property double lastUpdated: 0
 
     // Runtime state shared with every widget surface.
     property bool stateLoaded: false
-    property bool isLoading: false
+    property int pendingRequests: 0
+    readonly property bool isLoading: pendingRequests > 0
+    property var instanceErrors: ({})
     property string errorMessage: ""
     property int requestSequence: 0
 
+    // $4 and $5 are the keyring keys to try in order: the per-instance key
+    // (token:<id> / password:<id>) and, for migrated legacy instances, the
+    // original un-namespaced key as fallback.
     readonly property string authenticatedCurlScript:
         "set -eu\n" +
         "mode=$1\n" +
         "user=$2\n" +
         "url=$3\n" +
+        "secret=''\n" +
+        "if [ \"$mode\" != none ]; then\n" +
+        "  for key in \"$4\" \"${5:-}\"; do\n" +
+        "    [ -n \"$key\" ] || continue\n" +
+        "    secret=$(secret-tool lookup service dms-ntfy key \"$key\" 2>/dev/null || true)\n" +
+        "    [ -n \"$secret\" ] && break\n" +
+        "  done\n" +
+        "  [ -n \"$secret\" ] || exit 67\n" +
+        "fi\n" +
         "case \"$mode\" in\n" +
         "  token)\n" +
-        "    secret=$(secret-tool lookup service dms-ntfy key token 2>/dev/null || true)\n" +
-        "    [ -n \"$secret\" ] || exit 67\n" +
         "    printf 'Authorization: Bearer %s\\n' \"$secret\" | " +
         "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
         "    ;;\n" +
         "  basic)\n" +
-        "    secret=$(secret-tool lookup service dms-ntfy key password 2>/dev/null || true)\n" +
-        "    [ -n \"$secret\" ] || exit 67\n" +
         "    encoded=$(printf '%s:%s' \"$user\" \"$secret\" | base64 -w 0)\n" +
         "    printf 'Authorization: Basic %s\\n' \"$encoded\" | " +
         "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
@@ -69,11 +74,10 @@ PluginComponent {
 
     function _archiveObject() {
         return {
-            version: 1,
+            version: 2,
             messages: messages,
             dismissedUids: dismissedUids,
-            cursor: cursor,
-            cursorContext: cursorContext,
+            cursors: cursors,
             lastUpdated: lastUpdated
         }
     }
@@ -89,9 +93,25 @@ PluginComponent {
         pluginService.setGlobalVar(pluginId, "unreadCount", Ntfy.unreadCount(messages, "__all__"))
         pluginService.setGlobalVar(pluginId, "topics", Ntfy.topicList(configuredTopics, messages))
         pluginService.setGlobalVar(pluginId, "configured", configured)
+        pluginService.setGlobalVar(pluginId, "instances", instances)
         pluginService.setGlobalVar(pluginId, "loading", isLoading)
         pluginService.setGlobalVar(pluginId, "errorMessage", errorMessage)
         pluginService.setGlobalVar(pluginId, "lastUpdated", lastUpdated)
+    }
+
+    function _instanceCursor(instanceId) {
+        var entry = cursors ? cursors[instanceId] : null
+        if (!entry)
+            return ""
+        return String(entry.cursor || "")
+    }
+
+    function _setInstanceCursor(instanceId, cursorValue, context) {
+        var next = {}
+        for (var key in cursors)
+            next[key] = cursors[key]
+        next[instanceId] = { cursor: String(cursorValue || ""), context: context }
+        cursors = next
     }
 
     function loadArchive() {
@@ -100,65 +120,104 @@ PluginComponent {
                     : {}
         messages = saved ? Ntfy.toArray(saved.messages) : []
         dismissedUids = saved ? Ntfy.toArray(saved.dismissedUids) : []
-        cursor = saved ? String(saved.cursor || "") : ""
-        cursorContext = saved ? String(saved.cursorContext || "") : ""
         lastUpdated = saved ? parseInt(saved.lastUpdated) || 0 : 0
-        if (cursorContext !== contextKey)
-            cursor = ""
-        cursorContext = contextKey
+
+        var loadedCursors = saved && saved.cursors && typeof saved.cursors === "object"
+                            ? saved.cursors : {}
+        // Version 1 archives kept one global cursor; it belongs to the
+        // migrated legacy instance when its context still matches.
+        if (saved && saved.cursor && instances.length > 0
+                && String(saved.cursorContext || "")
+                   === instances[0].baseUrl + "|" + instances[0].topics.join(",")) {
+            loadedCursors = {}
+            loadedCursors[instances[0].id] = {
+                cursor: String(saved.cursor),
+                context: _instanceContext(instances[0])
+            }
+        }
+        // Drop cursors whose instance configuration changed.
+        var valid = {}
+        for (var i = 0; i < instances.length; i++) {
+            var instance = instances[i]
+            var entry = loadedCursors[instance.id]
+            if (entry && String(entry.context || "") === _instanceContext(instance))
+                valid[instance.id] = entry
+        }
+        cursors = valid
         stateLoaded = true
         publishRuntime()
     }
 
-    function _curlArguments(url) {
-        if (authMethod === "none") {
+    function _instanceContext(instance) {
+        return instance.baseUrl + "|" + instance.topics.join(",")
+    }
+
+    function _curlArguments(instance, url) {
+        if (instance.authMethod === "none") {
             return [
                 "curl", "-sS", "--max-time", "25",
                 "-w", "\n%{http_code}", url
             ]
         }
+        var keys = Ntfy.secretKeys(instance, instance.authMethod === "token"
+                                   ? "token" : "password")
         return [
             "sh", "-c", authenticatedCurlScript, "dms-ntfy",
-            authMethod, username, url
+            instance.authMethod, instance.username, url,
+            keys[0] || "", keys[1] || ""
         ]
     }
 
     function fetchMessages() {
         if (!stateLoaded || !configured || isLoading)
             return
-        isLoading = true
+        instanceErrors = {}
         errorMessage = ""
+        for (var i = 0; i < instances.length; i++) {
+            var instance = instances[i]
+            if (!Ntfy.instanceConfigured(instance))
+                continue
+            pendingRequests++
+            var since = _instanceCursor(instance.id)
+            _requestInstance(instance, since !== "" ? since : "all", true)
+        }
         publishRuntime()
-        _requestMessages(cursor !== "" ? cursor : "all", true)
     }
 
-    function _requestMessages(since, allowFallback) {
-        var url = Ntfy.subscriptionUrl(baseUrl, configuredTopics, since)
+    function _finishRequest() {
+        pendingRequests = Math.max(0, pendingRequests - 1)
+        if (pendingRequests === 0) {
+            errorMessage = Ntfy.combineErrors(instanceErrors, instances)
+            persistArchive()
+        }
+        publishRuntime()
+    }
+
+    function _requestInstance(instance, since, allowFallback) {
+        var url = Ntfy.subscriptionUrl(instance.baseUrl, instance.topics, since)
         if (url === "") {
-            isLoading = false
-            errorMessage = "Configure a valid ntfy URL and at least one topic"
-            publishRuntime()
+            instanceErrors[instance.id] = "invalid URL or topics"
+            _finishRequest()
             return
         }
         Proc.runCommand(
-            "ntfy.fetch." + (++requestSequence),
-            _curlArguments(url),
+            "ntfy.fetch." + instance.id + "." + (++requestSequence),
+            _curlArguments(instance, url),
             (stdout, exitCode) => {
                 var response = Ntfy.parseCurl(stdout, exitCode)
                 if (allowFallback && since !== "all" && response.status === 400) {
-                    cursor = ""
-                    _requestMessages("all", false)
+                    _setInstanceCursor(instance.id, "", _instanceContext(instance))
+                    _requestInstance(instance, "all", false)
                     return
                 }
 
-                isLoading = false
                 if (response.status !== 200) {
-                    errorMessage = Ntfy.errorText(response)
-                    publishRuntime()
+                    instanceErrors[instance.id] = Ntfy.errorText(response)
+                    _finishRequest()
                     return
                 }
 
-                var incoming = Ntfy.parseNdjson(response.body, baseUrl)
+                var incoming = Ntfy.parseNdjson(response.body, instance.baseUrl)
                 var merged = Ntfy.mergeMessages(
                     messages,
                     incoming,
@@ -166,12 +225,13 @@ PluginComponent {
                     historyLimit
                 )
                 messages = merged.messages
-                cursor = Ntfy.newestMessageId(incoming, cursor)
-                cursorContext = contextKey
+                _setInstanceCursor(
+                    instance.id,
+                    Ntfy.newestMessageId(incoming, _instanceCursor(instance.id)),
+                    _instanceContext(instance)
+                )
                 lastUpdated = Date.now()
-                errorMessage = ""
-                persistArchive()
-                publishRuntime()
+                _finishRequest()
             }
         )
     }
@@ -382,6 +442,7 @@ PluginComponent {
 
         function status(): string {
             return "configured=" + root.configured
+                   + " instances=" + root.instances.length
                    + " loading=" + root.isLoading
                    + " messages=" + root.messages.length
                    + " unread=" + Ntfy.unreadCount(root.messages, "__all__")
@@ -412,20 +473,18 @@ PluginComponent {
     onContextKeyChanged: {
         if (!stateLoaded)
             return
-        cursor = ""
-        cursorContext = contextKey
+        // Keep only cursors whose instance configuration is unchanged; new or
+        // edited instances start from a full sync.
+        var valid = {}
+        for (var i = 0; i < instances.length; i++) {
+            var instance = instances[i]
+            var entry = cursors ? cursors[instance.id] : null
+            if (entry && String(entry.context || "") === _instanceContext(instance))
+                valid[instance.id] = entry
+        }
+        cursors = valid
         publishRuntime()
         configurationRefreshTimer.restart()
-    }
-
-    onAuthMethodChanged: {
-        if (stateLoaded)
-            configurationRefreshTimer.restart()
-    }
-
-    onUsernameChanged: {
-        if (stateLoaded && authMethod === "basic")
-            configurationRefreshTimer.restart()
     }
 
     onSecretsStampChanged: {

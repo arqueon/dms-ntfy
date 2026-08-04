@@ -24,7 +24,10 @@ PluginComponent {
     readonly property bool isLoading: loadingGlobal.value === true
     readonly property string errorMessage: String(errorGlobal.value || "")
     readonly property double lastUpdated: parseInt(updatedGlobal.value) || 0
-    readonly property string instanceUrl: Ntfy.normalizeBaseUrl(pluginData.baseUrl || "https://ntfy.sh")
+    readonly property var configuredInstances: Ntfy.parseInstances(pluginData)
+    readonly property int instanceCount: configuredInstances.length
+    readonly property string instanceUrl: instanceCount > 0
+                                          ? configuredInstances[0].baseUrl : ""
 
     property string activeTopic: "__all__"
     property string searchQuery: ""
@@ -967,6 +970,32 @@ PluginComponent {
                                         }
                                     }
 
+                                    Rectangle {
+                                        // Server-of-origin chip; only useful
+                                        // once several servers feed the archive.
+                                        visible: root.instanceCount > 1
+                                                 && String(notificationCard
+                                                           .modelData.source
+                                                           || "") !== ""
+                                        width: visible
+                                               ? hostLabel.implicitWidth
+                                                 + Theme.spacingS * 2
+                                               : 0
+                                        height: 21
+                                        radius: height / 2
+                                        color: Theme.withAlpha(Theme.secondary, 0.14)
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        StyledText {
+                                            id: hostLabel
+                                            anchors.centerIn: parent
+                                            text: Ntfy.sourceLabel(
+                                                notificationCard.modelData.source)
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                        }
+                                    }
+
                                     StyledText {
                                         width: Math.max(
                                             20,
@@ -975,8 +1004,9 @@ PluginComponent {
                                             - parent.children[1].width
                                             - parent.children[2].width
                                             - parent.children[3].width
+                                            - parent.children[4].width
                                             - cardActions.width
-                                            - Theme.spacingXS * 6
+                                            - Theme.spacingXS * 7
                                         )
                                         text: Ntfy.relativeTime(
                                             notificationCard.modelData.time

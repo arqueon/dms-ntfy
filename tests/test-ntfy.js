@@ -91,4 +91,83 @@ assert.deepEqual(
     ["alerts", "system"]
 )
 
+// Multi-instance helpers.
+
+const migrated = context.parseInstances({
+    baseUrl: "notify.example.org",
+    topics: "alerts,system",
+    authMethod: "token",
+    username: ""
+})
+assert.equal(migrated.length, 1)
+assert.equal(migrated[0].id, "main")
+assert.equal(migrated[0].baseUrl, "https://notify.example.org")
+assert.deepEqual(Array.from(migrated[0].topics), ["alerts", "system"])
+assert.equal(migrated[0].legacySecrets, true)
+assert.deepEqual(
+    Array.from(context.secretKeys(migrated[0], "token")),
+    ["token:main", "token"]
+)
+
+const multi = context.parseInstances({
+    instances: [
+        { id: "main", baseUrl: "https://notify.example.org", topics: "alerts",
+          authMethod: "token", legacySecrets: true },
+        { id: "btb", baseUrl: "notify.btb.org/", topics: ["centinela", "btb"],
+          authMethod: "basic", username: "ruben" },
+        { id: "", baseUrl: "https://ignored.example.org", topics: "x" },
+        { id: "btb", baseUrl: "https://duplicate.example.org", topics: "y" }
+    ],
+    baseUrl: "https://legacy-ignored.example.org",
+    topics: "legacy"
+})
+assert.equal(multi.length, 2)
+assert.equal(multi[1].baseUrl, "https://notify.btb.org")
+assert.deepEqual(
+    Array.from(context.secretKeys(multi[1], "password")),
+    ["password:btb"]
+)
+assert.equal(context.instanceConfigured(multi[0]), true)
+assert.equal(
+    context.instanceConfigured({ id: "x", baseUrl: "https://x.org",
+                                 topics: ["a"], authMethod: "basic",
+                                 username: "" }),
+    false
+)
+assert.deepEqual(
+    Array.from(context.instancesTopics(multi)),
+    ["alerts", "centinela", "btb"]
+)
+assert.equal(
+    context.instancesContextKey(multi),
+    "main|https://notify.example.org|alerts"
+    + "&&btb|https://notify.btb.org|centinela,btb"
+)
+assert.equal(
+    context.combineErrors({ btb: "credentials rejected (401)" }, multi),
+    "notify.btb.org: credentials rejected (401)"
+)
+assert.equal(context.combineErrors({}, multi), "")
+
+// Instances parsed from a JSON string (settings written by older tooling).
+const fromString = context.parseInstances({
+    instances: JSON.stringify([
+        { id: "a", baseUrl: "https://a.example.org", topics: "t1" }
+    ])
+})
+assert.equal(fromString.length, 1)
+assert.equal(fromString[0].id, "a")
+
+// No configuration at all yields no instances.
+assert.deepEqual(Array.from(context.parseInstances({})), [])
+
+assert.equal(context.sourceLabel("https://notify.arqueonautis.org"), "arqueonautis")
+assert.equal(
+    context.sourceLabel("https://notify.barbiestesteadoras.org"),
+    "barbiestesteadoras"
+)
+assert.equal(context.sourceLabel("https://ntfy.sh"), "ntfy.sh")
+assert.equal(context.sourceLabel("https://push.corp.example.com"), "corp")
+assert.equal(context.sourceLabel("http://localhost:8098"), "localhost")
+
 console.log("ntfy helper tests: OK")
