@@ -23,6 +23,9 @@ PluginSettings {
     property var secretStored: ({})
     // instance id -> "", "saving", "ok" or "error" for the inline feedback.
     property var secretStatus: ({})
+    // instance id -> { status: ""|"loading"|"ok"|"error", error, topics } for
+    // the topics recovered from the server's /v1/account.
+    property var discovered: ({})
 
     // The shell injects pluginService shortly after creation; loading before
     // that yields defaults, and a save in that window would overwrite the real
@@ -84,6 +87,80 @@ PluginSettings {
         next.splice(index, 1)
         instances = next
         _persist()
+    }
+
+    function _setDiscovered(instanceId, entry) {
+        var next = {}
+        for (var key in discovered)
+            next[key] = discovered[key]
+        next[instanceId] = entry
+        discovered = next
+    }
+
+    // Ask the server which topics this account can see: its server-side
+    // subscriptions plus its reservations. ntfy has no endpoint that lists
+    // every topic, so anything never subscribed nor reserved won't appear.
+    function discoverTopics(index) {
+        var instance = instances[index]
+        if (!instance)
+            return
+        var url = Ntfy.accountUrl(instance.baseUrl)
+        if (url === "") {
+            _setDiscovered(instance.id, {
+                status: "error", error: "configure the server URL first",
+                topics: []
+            })
+            return
+        }
+        _setDiscovered(instance.id, { status: "loading", error: "", topics: [] })
+        var args
+        if (instance.authMethod === "none") {
+            args = ["curl", "-sS", "--max-time", "25",
+                    "-w", "\n%{http_code}", url]
+        } else {
+            var keys = Ntfy.secretKeys(
+                instance, instance.authMethod === "token" ? "token" : "password")
+            args = ["sh", "-c", Ntfy.AUTH_CURL_SCRIPT, "dms-ntfy",
+                    instance.authMethod, instance.username, url,
+                    keys[0] || "", keys[1] || ""]
+        }
+        Proc.runCommand(
+            "ntfy.settings.discover." + instance.id, args,
+            (stdout, exitCode) => {
+                var response = Ntfy.parseCurl(stdout, exitCode)
+                if (response.status !== 200) {
+                    _setDiscovered(instance.id, {
+                        status: "error", error: Ntfy.errorText(response),
+                        topics: []
+                    })
+                    return
+                }
+                var topics = Ntfy.accountTopics(response.body, instance.baseUrl)
+                if (topics === null) {
+                    _setDiscovered(instance.id, {
+                        status: "error", error: "unreadable account response",
+                        topics: []
+                    })
+                    return
+                }
+                _setDiscovered(instance.id, {
+                    status: "ok", error: "", topics: topics
+                })
+            }
+        )
+    }
+
+    function toggleTopic(index, topic) {
+        var instance = instances[index]
+        if (!instance)
+            return
+        var topics = Ntfy.toArray(instance.topics).slice()
+        var position = topics.indexOf(topic)
+        if (position >= 0)
+            topics.splice(position, 1)
+        else
+            topics.push(topic)
+        updateInstance(index, { topics: Ntfy.parseTopics(topics) })
     }
 
     function _setSecretStatus(instanceId, status) {
@@ -305,6 +382,114 @@ PluginSettings {
                     onEditingFinished: root.updateInstance(
                         instanceCard.index,
                         { topics: Ntfy.parseTopics(text) })
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: Theme.spacingS
+
+                    Rectangle {
+                        width: discoverLabel.implicitWidth + Theme.spacingM * 2
+                        height: 30
+                        radius: Theme.cornerRadius
+                        color: discoverArea.containsMouse
+                               ? Theme.withAlpha(Theme.primary, 0.35)
+                               : Theme.withAlpha(Theme.primary, 0.22)
+
+                        StyledText {
+                            id: discoverLabel
+                            anchors.centerIn: parent
+                            text: "Fetch topics from server"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.Medium
+                            color: Theme.primary
+                        }
+
+                        MouseArea {
+                            id: discoverArea
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.discoverTopics(instanceCard.index)
+                        }
+                    }
+
+                    StyledText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - 220
+                        text: {
+                            var entry = root.discovered[instanceCard.modelData.id]
+                            if (!entry)
+                                return ""
+                            if (entry.status === "loading")
+                                return "Querying the account…"
+                            if (entry.status === "error")
+                                return "✗ " + entry.error
+                            if (entry.status === "ok" && entry.topics.length === 0)
+                                return "The account has no subscriptions or reserved topics on this server"
+                            return ""
+                        }
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: {
+                            var entry = root.discovered[instanceCard.modelData.id]
+                            return entry && entry.status === "error"
+                                   ? Theme.error : Theme.surfaceVariantText
+                        }
+                        wrapMode: Text.WordWrap
+                    }
+                }
+
+                Flow {
+                    width: parent.width
+                    spacing: Theme.spacingXS
+                    visible: {
+                        var entry = root.discovered[instanceCard.modelData.id]
+                        return !!entry && entry.status === "ok"
+                               && entry.topics.length > 0
+                    }
+
+                    Repeater {
+                        model: {
+                            var entry = root.discovered[instanceCard.modelData.id]
+                            return entry ? Ntfy.toArray(entry.topics) : []
+                        }
+
+                        delegate: Rectangle {
+                            required property var modelData
+
+                            readonly property bool selected:
+                                Ntfy.toArray(instanceCard.modelData.topics)
+                                    .indexOf(modelData) !== -1
+
+                            width: topicChipLabel.implicitWidth + Theme.spacingM * 2
+                            height: 30
+                            radius: Theme.cornerRadius
+                            color: selected
+                                   ? Theme.withAlpha(Theme.primary, 0.3)
+                                   : topicChipArea.containsMouse
+                                     ? Theme.withAlpha(Theme.primary, 0.15)
+                                     : Theme.surfaceContainer
+
+                            StyledText {
+                                id: topicChipLabel
+                                anchors.centerIn: parent
+                                text: (parent.selected ? "✓ " : "") + parent.modelData
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: parent.selected
+                                       ? Theme.primary
+                                       : Theme.surfaceText
+                            }
+
+                            MouseArea {
+                                id: topicChipArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.toggleTopic(
+                                    instanceCard.index, parent.modelData)
+                            }
+                        }
+                    }
                 }
 
                 StyledText {

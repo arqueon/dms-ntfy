@@ -32,6 +32,13 @@ archive later.
   same archive and topic sections; each card shows its source instance.
 - Works with ntfy.sh or any self-hosted instance, public topics, access tokens, or
   HTTP Basic authentication — chosen per server.
+- **Topic discovery**: a *Fetch topics from server* button per server queries
+  `/v1/account` with the stored credentials and offers the account's server-side
+  subscriptions and reserved topics as toggleable chips, so on a new machine you
+  type the token once and pick topics instead of retyping them. ntfy has no
+  endpoint that lists *every* topic — subscribe to a topic in the server's web
+  app (or reserve it) and it becomes discoverable; ad-hoc topics still go in the
+  manual field.
 - Credentials are stored in the system keyring with `secret-tool` (one entry per
   server: key `token:<id>` or `password:<id>`), never in `plugin_settings.json`.
   Configurations from versions before 0.3.0 migrate automatically into a single

@@ -170,4 +170,39 @@ assert.equal(context.sourceLabel("https://ntfy.sh"), "ntfy.sh")
 assert.equal(context.sourceLabel("https://push.corp.example.com"), "corp")
 assert.equal(context.sourceLabel("http://localhost:8098"), "localhost")
 
+// Topic discovery from /v1/account: union of same-server subscriptions and
+// reservations, deduplicated; foreign-server subscriptions are excluded.
+assert.equal(
+    context.accountUrl("notify.example.org/"),
+    "https://notify.example.org/v1/account"
+)
+assert.equal(context.accountUrl(""), "")
+assert.deepEqual(
+    Array.from(context.accountTopics(JSON.stringify({
+        username: "ruben",
+        subscriptions: [
+            { base_url: "https://notify.example.org", topic: "alerts" },
+            { base_url: "https://ntfy.sh", topic: "foreign" },
+            { topic: "backups" }
+        ],
+        reservations: [
+            { topic: "alerts", everyone: "deny-all" },
+            { topic: "system", everyone: "read-only" }
+        ]
+    }), "notify.example.org")),
+    ["alerts", "backups", "system"]
+)
+// An account with nothing attached yields an empty list, not an error.
+assert.deepEqual(
+    Array.from(context.accountTopics('{"username":"*"}', "https://x.org")),
+    []
+)
+// Broken payloads surface as null so the UI can tell "empty" from "unreadable".
+assert.equal(context.accountTopics("not json", "https://x.org"), null)
+assert.equal(context.accountTopics('"just a string"', "https://x.org"), null)
+// The shared curl recipe keeps the secret off argv: it must read the keyring
+// and pipe the header through stdin.
+assert.ok(context.AUTH_CURL_SCRIPT.indexOf("secret-tool lookup") !== -1)
+assert.ok(context.AUTH_CURL_SCRIPT.indexOf("-H @-") !== -1)
+
 console.log("ntfy helper tests: OK")

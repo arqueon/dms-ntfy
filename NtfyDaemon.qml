@@ -40,37 +40,9 @@ PluginComponent {
     property string errorMessage: ""
     property int requestSequence: 0
 
-    // $4 and $5 are the keyring keys to try in order: the per-instance key
-    // (token:<id> / password:<id>) and, for migrated legacy instances, the
-    // original un-namespaced key as fallback.
-    readonly property string authenticatedCurlScript:
-        "set -eu\n" +
-        "mode=$1\n" +
-        "user=$2\n" +
-        "url=$3\n" +
-        "secret=''\n" +
-        "if [ \"$mode\" != none ]; then\n" +
-        "  for key in \"$4\" \"${5:-}\"; do\n" +
-        "    [ -n \"$key\" ] || continue\n" +
-        "    secret=$(secret-tool lookup service dms-ntfy key \"$key\" 2>/dev/null || true)\n" +
-        "    [ -n \"$secret\" ] && break\n" +
-        "  done\n" +
-        "  [ -n \"$secret\" ] || exit 67\n" +
-        "fi\n" +
-        "case \"$mode\" in\n" +
-        "  token)\n" +
-        "    printf 'Authorization: Bearer %s\\n' \"$secret\" | " +
-        "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
-        "    ;;\n" +
-        "  basic)\n" +
-        "    encoded=$(printf '%s:%s' \"$user\" \"$secret\" | base64 -w 0)\n" +
-        "    printf 'Authorization: Basic %s\\n' \"$encoded\" | " +
-        "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
-        "    ;;\n" +
-        "  *)\n" +
-        "    curl -sS --max-time 25 -w '\\n%{http_code}' \"$url\"\n" +
-        "    ;;\n" +
-        "esac"
+    // The auth curl recipe lives in ntfy.js (AUTH_CURL_SCRIPT) so the
+    // settings' topic discovery reuses it verbatim.
+    readonly property string authenticatedCurlScript: Ntfy.AUTH_CURL_SCRIPT
 
     function _archiveObject() {
         return {

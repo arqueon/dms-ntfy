@@ -163,6 +163,74 @@ function subscriptionUrl(baseUrl, topics, since) {
            + encodeURIComponent(String(since || "all"))
 }
 
+function accountUrl(baseUrl) {
+    var root = normalizeBaseUrl(baseUrl)
+    return root === "" ? "" : root + "/v1/account"
+}
+
+// GET /v1/account is the only topic enumeration ntfy offers: the union of the
+// account's server-side subscriptions (filtered to this server, because the
+// web app can subscribe to topics hosted elsewhere) and its reserved topics.
+// Topics only ever published to ad hoc stay invisible to this endpoint.
+function accountTopics(body, baseUrl) {
+    var account
+    try {
+        account = JSON.parse(String(body || ""))
+    } catch (error) {
+        return null
+    }
+    if (!account || typeof account !== "object")
+        return null
+    var root = normalizeBaseUrl(baseUrl)
+    var found = []
+    var subscriptions = toArray(account.subscriptions)
+    for (var i = 0; i < subscriptions.length; i++) {
+        var subscription = subscriptions[i] || {}
+        var origin = String(subscription.base_url || "")
+        if (origin !== "" && normalizeBaseUrl(origin) !== root)
+            continue
+        found.push(subscription.topic)
+    }
+    var reservations = toArray(account.reservations)
+    for (var j = 0; j < reservations.length; j++)
+        found.push((reservations[j] || {}).topic)
+    return parseTopics(found)
+}
+
+// Shared by the daemon's polling and the settings' topic discovery. $1 mode,
+// $2 user, $3 url; $4 and $5 are the keyring keys to try in order: the
+// per-instance key (token:<id> / password:<id>) and, for migrated legacy
+// instances, the original un-namespaced key as fallback. The secret travels
+// stdin -> curl -H @-, never argv.
+var AUTH_CURL_SCRIPT =
+    "set -eu\n" +
+    "mode=$1\n" +
+    "user=$2\n" +
+    "url=$3\n" +
+    "secret=''\n" +
+    "if [ \"$mode\" != none ]; then\n" +
+    "  for key in \"$4\" \"${5:-}\"; do\n" +
+    "    [ -n \"$key\" ] || continue\n" +
+    "    secret=$(secret-tool lookup service dms-ntfy key \"$key\" 2>/dev/null || true)\n" +
+    "    [ -n \"$secret\" ] && break\n" +
+    "  done\n" +
+    "  [ -n \"$secret\" ] || exit 67\n" +
+    "fi\n" +
+    "case \"$mode\" in\n" +
+    "  token)\n" +
+    "    printf 'Authorization: Bearer %s\\n' \"$secret\" | " +
+    "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
+    "    ;;\n" +
+    "  basic)\n" +
+    "    encoded=$(printf '%s:%s' \"$user\" \"$secret\" | base64 -w 0)\n" +
+    "    printf 'Authorization: Basic %s\\n' \"$encoded\" | " +
+    "curl -sS --max-time 25 -w '\\n%{http_code}' -H @- \"$url\"\n" +
+    "    ;;\n" +
+    "  *)\n" +
+    "    curl -sS --max-time 25 -w '\\n%{http_code}' \"$url\"\n" +
+    "    ;;\n" +
+    "esac"
+
 function parseCurl(stdout, exitCode) {
     var raw = String(stdout || "")
     if (exitCode !== 0 && raw.trim() === "")
