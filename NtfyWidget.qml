@@ -1,5 +1,5 @@
 // NtfyWidget.qml — review inbox for the persistent archive maintained by
-// NtfyDaemon.qml. Uses the official ntfy icon in both bar orientations.
+// NtfyDaemon.qml. Uses a distinct Material sensors icon in both bar orientations.
 
 import QtQuick
 import Quickshell
@@ -341,36 +341,27 @@ PluginComponent {
                 spacing: Theme.spacingXS
                 anchors.verticalCenter: parent.verticalCenter
 
-                NtfyIcon {
-                    size: Math.max(17, root.iconSize)
-                    iconColor: {
+                DankIcon {
+                    name: "sensors"
+                    size: root.iconSize
+                    color: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return root.unreadCount > 0
-                            ? Theme.primary : Theme.surfaceText
+                        return Theme.primary
                     }
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
-                Rectangle {
+                NumericText {
                     visible: root.unreadCount > 0
-                    width: Math.max(horizontalBadgeText.implicitWidth + 10, height)
-                    height: 16
-                    radius: height / 2
+                    text: Ntfy.formatCount(root.unreadCount)
+                    reserveText: "99+"
+                    width: reservedWidth
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Bold
                     color: Theme.primary
+                    horizontalAlignment: Text.AlignHCenter
                     anchors.verticalCenter: parent.verticalCenter
-
-                    StyledText {
-                        id: horizontalBadgeText
-                        anchors.centerIn: parent
-                        text: Ntfy.formatCount(root.unreadCount)
-                        font.pixelSize: Math.max(
-                            9,
-                            Math.round(Theme.fontSizeSmall * 0.8)
-                        )
-                        font.weight: Font.Bold
-                        color: Theme.onPrimary
-                    }
                 }
             }
         }
@@ -384,38 +375,29 @@ PluginComponent {
 
             Column {
                 id: verticalContent
-                spacing: Theme.spacingXS
+                spacing: 1
 
-                NtfyIcon {
-                    size: Math.max(17, root.iconSize)
-                    iconColor: {
+                DankIcon {
+                    name: "sensors"
+                    size: root.iconSize
+                    color: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return root.unreadCount > 0
-                            ? Theme.primary : Theme.surfaceText
+                        return Theme.primary
                     }
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
 
-                Rectangle {
+                NumericText {
                     visible: root.unreadCount > 0
-                    width: Math.max(verticalBadgeText.implicitWidth + 10, height)
-                    height: 16
-                    radius: height / 2
+                    text: Ntfy.formatCount(root.unreadCount)
+                    reserveText: "99+"
+                    width: reservedWidth
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Bold
                     color: Theme.primary
+                    horizontalAlignment: Text.AlignHCenter
                     anchors.horizontalCenter: parent.horizontalCenter
-
-                    StyledText {
-                        id: verticalBadgeText
-                        anchors.centerIn: parent
-                        text: Ntfy.formatCount(root.unreadCount)
-                        font.pixelSize: Math.max(
-                            9,
-                            Math.round(Theme.fontSizeSmall * 0.8)
-                        )
-                        font.weight: Font.Bold
-                        color: Theme.onPrimary
-                    }
                 }
             }
         }

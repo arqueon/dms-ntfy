@@ -4,7 +4,7 @@
     "description": "Persistent ntfy inbox for the DankBar with an All view, per-topic sections, unread state, search, links, attachments, and local dismissal",
     "version": "0.3.0",
     "author": "arqueon",
-    "icon": "notifications",
+    "icon": "sensors",
     "type": "composite",
     "category": "productivity",
     "capabilities": [

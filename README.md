@@ -12,7 +12,7 @@ archive later.
 
 ## Features
 
-- Official ntfy icon and unread badge in both horizontal and vertical DankBars.
+- Distinct blue sensors icon and centered unread count in horizontal and vertical DankBars.
 - One **All** view plus a section for every configured or previously seen topic.
 - Persistent local history: messages survive DMS restarts and the ntfy server's
   temporary message cache. Nothing is removed until you explicitly dismiss it

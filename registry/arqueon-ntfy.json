@@ -11,7 +11,7 @@
     "description": "A persistent ntfy review inbox for the DankBar with All and per-topic views, unread state, local search, links, attachments, and explicit local dismissal. Polls multiple servers at once \u2014 ntfy.sh or any self-hosted instance, each with its own topics and credentials \u2014 and tags every card with its server of origin.",
     "version": "0.3.0",
     "author": "arqueon",
-    "icon": "notifications",
+    "icon": "sensors",
     "type": "composite",
     "components": {
         "daemon": "./NtfyDaemon.qml",
