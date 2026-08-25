@@ -8,6 +8,7 @@ Item {
     id: root
 
     property int size: 20
+    property real opticalScale: 1.0
     property color iconColor: Theme.surfaceText
     property real iconOpacity: 0.9
 
@@ -15,7 +16,9 @@ Item {
     height: size
 
     Image {
-        anchors.fill: parent
+        width: Math.round(root.size * root.opticalScale)
+        height: width
+        anchors.centerIn: parent
         source: Qt.resolvedUrl("Images/ntfy-outline.svg")
         sourceSize.width: root.width * 2
         sourceSize.height: root.height * 2

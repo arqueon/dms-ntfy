@@ -12,7 +12,7 @@ archive later.
 
 ## Features
 
-- Distinct blue sensors icon and centered unread count in horizontal and vertical DankBars.
+- Official ntfy application icon, optically scaled inside DMS's native icon box, with a centered unread count in horizontal and vertical DankBars.
 - One **All** view plus a section for every configured or previously seen topic.
 - Persistent local history: messages survive DMS restarts and the ntfy server's
   temporary message cache. Nothing is removed until you explicitly dismiss it

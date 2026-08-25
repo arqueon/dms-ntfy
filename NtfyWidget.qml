@@ -341,10 +341,10 @@ PluginComponent {
                 spacing: Theme.spacingXS
                 anchors.verticalCenter: parent.verticalCenter
 
-                DankIcon {
-                    name: "sensors"
+                NtfyIcon {
                     size: root.iconSize
-                    color: {
+                    opticalScale: 0.78
+                    iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
                         return Theme.primary
@@ -377,10 +377,10 @@ PluginComponent {
                 id: verticalContent
                 spacing: 1
 
-                DankIcon {
-                    name: "sensors"
+                NtfyIcon {
                     size: root.iconSize
-                    color: {
+                    opticalScale: 0.78
+                    iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
                         return Theme.primary
