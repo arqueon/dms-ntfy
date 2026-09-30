@@ -2,7 +2,7 @@
     "id": "ntfy",
     "name": "dms-ntfy",
     "description": "Persistent ntfy inbox for the DankBar with an All view, per-topic sections, unread state, search, links, attachments, and local dismissal",
-    "version": "0.3.0",
+    "version": "0.3.1",
     "author": "arqueon",
     "icon": "sensors",
     "type": "composite",

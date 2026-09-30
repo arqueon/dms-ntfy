@@ -429,7 +429,7 @@ PluginComponent {
             Item {
                 id: customHeader
                 width: parent.width
-                height: 40
+                height: Theme.iconSizeLarge + Theme.spacingS
 
                 StyledText {
                     id: headerTitle
@@ -437,7 +437,7 @@ PluginComponent {
                     anchors.leftMargin: Theme.spacingS
                     anchors.verticalCenter: parent.verticalCenter
                     text: "dms-ntfy"
-                    font.pixelSize: Theme.fontSizeLarge + 4
+                    font.pixelSize: Theme.fontSizeXLarge
                     font.weight: Font.Bold
                     color: headerTitleMouse.containsMouse
                            ? Theme.primary
@@ -449,7 +449,7 @@ PluginComponent {
                     anchors.leftMargin: Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
                     name: "open_in_new"
-                    size: 16
+                    size: Theme.iconSizeSmall
                     color: Theme.primary
                     visible: headerTitleMouse.containsMouse
                 }
@@ -460,7 +460,7 @@ PluginComponent {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: Theme.spacingS + headerTitle.implicitWidth
-                           + Theme.spacingXS + 22
+                           + Theme.spacingXS + Theme.iconSize
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     enabled: root.instanceUrl !== ""
@@ -470,9 +470,9 @@ PluginComponent {
                 Rectangle {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    width: 32
-                    height: 32
-                    radius: 16
+                    width: Theme.iconSizeLarge
+                    height: Theme.iconSizeLarge
+                    radius: height / 2
                     color: closeArea.containsMouse
                            ? Theme.errorHover
                            : Theme.withAlpha(Theme.errorHover, 0)
@@ -774,8 +774,8 @@ PluginComponent {
                                         topicRow.modelData.value
                                     )
                                     visible: count > 0
-                                    width: Math.max(topicUnreadText.implicitWidth + 8, height)
-                                    height: 18
+                                    width: Math.max(topicUnreadText.implicitWidth + Theme.spacingS, height)
+                                    height: Theme.iconSizeSmall + Theme.spacingXS
                                     radius: height / 2
                                     color: Theme.primary
                                     anchors.verticalCenter: parent.verticalCenter
@@ -784,7 +784,7 @@ PluginComponent {
                                         id: topicUnreadText
                                         anchors.centerIn: parent
                                         text: Ntfy.formatCount(parent.count)
-                                        font.pixelSize: 9
+                                        font.pixelSize: Theme.fontSizeSmall
                                         font.weight: Font.Bold
                                         color: Theme.onPrimary
                                     }
