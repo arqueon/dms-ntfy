@@ -11,6 +11,7 @@ import "./JS/ntfy.js" as Ntfy
 
 PluginComponent {
     id: root
+    readonly property int barLabelSize: Theme.barTextSize(barThickness, barConfig ? barConfig.fontScale : undefined, barConfig ? barConfig.maximizeWidgetText : undefined)
 
     property var popoutService: null
 
@@ -164,7 +165,7 @@ PluginComponent {
 
             DankIcon {
                 name: linkChip.iconName
-                size: 15
+                size: Theme.iconSizeSmall
                 color: Theme.primary
                 anchors.verticalCenter: parent.verticalCenter
             }
@@ -347,7 +348,7 @@ PluginComponent {
                     iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return Theme.primary
+                        return root.unreadCount > 0 ? Theme.primary : Theme.widgetIconColor
                     }
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -357,7 +358,7 @@ PluginComponent {
                     text: Ntfy.formatCount(root.unreadCount)
                     reserveText: "99+"
                     width: reservedWidth
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: root.barLabelSize
                     font.weight: Font.Bold
                     color: Theme.primary
                     horizontalAlignment: Text.AlignHCenter
@@ -375,7 +376,7 @@ PluginComponent {
 
             Column {
                 id: verticalContent
-                spacing: 1
+                spacing: Theme.spacingXXS
 
                 NtfyIcon {
                     size: root.iconSize
@@ -383,7 +384,7 @@ PluginComponent {
                     iconColor: {
                         if (!root.configured)
                             return Theme.surfaceVariantText
-                        return Theme.primary
+                        return root.unreadCount > 0 ? Theme.primary : Theme.widgetIconColor
                     }
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
@@ -393,7 +394,7 @@ PluginComponent {
                     text: Ntfy.formatCount(root.unreadCount)
                     reserveText: "99+"
                     width: reservedWidth
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: root.barLabelSize
                     font.weight: Font.Bold
                     color: Theme.primary
                     horizontalAlignment: Text.AlignHCenter
@@ -472,7 +473,7 @@ PluginComponent {
                     anchors.verticalCenter: parent.verticalCenter
                     width: Theme.iconSizeLarge
                     height: Theme.iconSizeLarge
-                    radius: height / 2
+                    radius: Theme.cornerRadius
                     color: closeArea.containsMouse
                            ? Theme.errorHover
                            : Theme.withAlpha(Theme.errorHover, 0)
@@ -734,7 +735,7 @@ PluginComponent {
 
                                 NtfyIcon {
                                     visible: topicRow.modelData.value === "__all__"
-                                    size: 17
+                                    size: Theme.iconSizeSmall
                                     iconColor: root.activeTopic === topicRow.modelData.value
                                                ? Theme.primary
                                                : Theme.surfaceVariantText
@@ -744,7 +745,7 @@ PluginComponent {
                                 DankIcon {
                                     visible: topicRow.modelData.value !== "__all__"
                                     name: "tag"
-                                    size: 17
+                                    size: Theme.iconSizeSmall
                                     color: root.activeTopic === topicRow.modelData.value
                                            ? Theme.primary
                                            : Theme.surfaceVariantText
@@ -776,7 +777,7 @@ PluginComponent {
                                     visible: count > 0
                                     width: Math.max(topicUnreadText.implicitWidth + Theme.spacingS, height)
                                     height: Theme.iconSizeSmall + Theme.spacingXS
-                                    radius: height / 2
+                                    radius: Theme.cornerRadius
                                     color: Theme.primary
                                     anchors.verticalCenter: parent.verticalCenter
 
@@ -888,7 +889,7 @@ PluginComponent {
                                                   )
                                                   ? "check_box"
                                                   : "check_box_outline_blank"
-                                            size: 18
+                                            size: Theme.iconSizeSmall + Theme.spacingXS
                                             color: root.isSelected(
                                                        notificationCard.modelData.uid
                                                    )
@@ -909,7 +910,7 @@ PluginComponent {
                                     Rectangle {
                                         width: 4
                                         height: 34
-                                        radius: 2
+                                        radius: Theme.cornerRadius
                                         color: notificationCard.modelData.read
                                                ? Theme.outline
                                                : Theme.primary
@@ -920,7 +921,7 @@ PluginComponent {
                                         name: Ntfy.priorityIcon(
                                             notificationCard.modelData.priority
                                         )
-                                        size: 17
+                                        size: Theme.iconSizeSmall
                                         color: {
                                             var priority =
                                                 notificationCard.modelData.priority
@@ -939,7 +940,7 @@ PluginComponent {
                                         width: topicLabel.implicitWidth
                                                + Theme.spacingS * 2
                                         height: 21
-                                        radius: height / 2
+                                        radius: Theme.cornerRadius
                                         color: Theme.withAlpha(Theme.primary, 0.14)
                                         anchors.verticalCenter: parent.verticalCenter
 
@@ -964,7 +965,7 @@ PluginComponent {
                                                  + Theme.spacingS * 2
                                                : 0
                                         height: 21
-                                        radius: height / 2
+                                        radius: Theme.cornerRadius
                                         color: Theme.withAlpha(Theme.secondary, 0.14)
                                         anchors.verticalCenter: parent.verticalCenter
 
@@ -1115,7 +1116,7 @@ PluginComponent {
                                                 width: tagText.implicitWidth
                                                        + Theme.spacingS * 2
                                                 height: 21
-                                                radius: height / 2
+                                                radius: Theme.cornerRadius
                                                 color: Theme.surfaceContainerHighest
 
                                                 StyledText {
@@ -1256,7 +1257,7 @@ PluginComponent {
                         visible: root.filteredMessages.length === 0
 
                         NtfyIcon {
-                            size: 52
+                            size: Theme.iconSizeLarge * 1.5
                             iconColor: Theme.surfaceVariantText
                             iconOpacity: 0.45
                             anchors.horizontalCenter: parent.horizontalCenter
