@@ -8,6 +8,7 @@ import QtQuick
 import Quickshell.Io
 import qs.Common
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 import "./JS/ntfy.js" as Ntfy
 
@@ -366,7 +367,7 @@ PluginSettings {
                     color: Theme.surfaceVariantText
                 }
 
-                DankTextField {
+                DCommon.DTextField {
                     width: parent.width
                     height: 36
                     text: instanceCard.modelData.baseUrl
@@ -382,7 +383,7 @@ PluginSettings {
                     color: Theme.surfaceVariantText
                 }
 
-                DankTextField {
+                DCommon.DTextField {
                     width: parent.width
                     height: 36
                     text: Ntfy.toArray(instanceCard.modelData.topics).join(",")
@@ -546,19 +547,35 @@ PluginSettings {
                                 anchors.fill: parent
                                 hoverEnabled: true
                                 cursorShape: Qt.PointingHandCursor
+                                // AIDEV-NOTE: updateInstance() reassigns `instances`, and the
+                                // outer Repeater binds `model: root.instances`, so that call
+                                // destroys and recreates every instanceCard delegate -- this
+                                // one included. Any statement after it runs in a dead QML
+                                // context, where id lookups fail with
+                                // "ReferenceError: root is not defined" (the former crash on
+                                // the second line of this handler). So: resolve every outer id
+                                // into a JS local up front, derive the refreshed instance
+                                // locally instead of re-reading root.instances[...], and keep
+                                // the destructive call LAST. JS locals hold live object
+                                // references and survive the delegate teardown; bare id
+                                // lookups do not.
                                 onClicked: {
-                                    root.updateInstance(
-                                        instanceCard.index,
-                                        { authMethod: parent.modelData.value })
-                                    root._refreshSecretIndicator(
-                                        root.instances[instanceCard.index])
+                                    var self = root
+                                    var instanceIndex = instanceCard.index
+                                    var nextAuth = chipArea.parent.modelData.value
+                                    var refreshed = Object.assign(
+                                        {}, self.instances[instanceIndex],
+                                        { authMethod: nextAuth })
+                                    self._refreshSecretIndicator(refreshed)
+                                    self.updateInstance(
+                                        instanceIndex, { authMethod: nextAuth })
                                 }
                             }
                         }
                     }
                 }
 
-                DankTextField {
+                DCommon.DTextField {
                     visible: instanceCard.modelData.authMethod === "basic"
                     width: parent.width
                     height: 36
@@ -589,7 +606,7 @@ PluginSettings {
                         width: parent.width
                         spacing: Theme.spacingS
 
-                        DankTextField {
+                        DCommon.DTextField {
                             id: secretField
                             width: parent.width - 100 - Theme.spacingS
                             height: 36

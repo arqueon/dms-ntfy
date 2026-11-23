@@ -6,6 +6,7 @@ import Quickshell
 import qs.Common
 import qs.Services
 import qs.Widgets
+import qs.DCommon.Widgets as DCommon
 import qs.Modules.Plugins
 import "./JS/ntfy.js" as Ntfy
 
@@ -163,7 +164,7 @@ PluginComponent {
             anchors.centerIn: parent
             spacing: Theme.spacingXS
 
-            DankIcon {
+            DCommon.DIcon {
                 name: linkChip.iconName
                 size: Theme.iconSizeSmall
                 color: Theme.primary
@@ -445,7 +446,7 @@ PluginComponent {
                            : Theme.surfaceText
                 }
 
-                DankIcon {
+                DCommon.DIcon {
                     anchors.left: headerTitle.right
                     anchors.leftMargin: Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
@@ -478,7 +479,7 @@ PluginComponent {
                            ? Theme.errorHover
                            : Theme.withAlpha(Theme.errorHover, 0)
 
-                    DankIcon {
+                    DCommon.DIcon {
                         anchors.centerIn: parent
                         name: "close"
                         size: Theme.iconSize - 4
@@ -517,7 +518,7 @@ PluginComponent {
                 width: parent.width
                 height: 40
 
-                DankTextField {
+                DCommon.DTextField {
                     id: searchField
                     anchors.left: parent.left
                     anchors.leftMargin: Theme.spacingS
@@ -537,7 +538,7 @@ PluginComponent {
                     }
                 }
 
-                DankActionButton {
+                DCommon.DActionButton {
                     visible: searchField.text !== ""
                     anchors.right: toolbarActions.left
                     anchors.rightMargin: Theme.spacingS
@@ -561,7 +562,7 @@ PluginComponent {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 0
 
-                    DankActionButton {
+                    DCommon.DActionButton {
                         iconName: "done_all"
                         buttonSize: 30
                         iconColor: root.unreadInView > 0
@@ -573,7 +574,7 @@ PluginComponent {
                         onClicked: root.markAllVisibleRead()
                     }
 
-                    DankActionButton {
+                    DCommon.DActionButton {
                         iconName: root.pendingDismissRead
                                   ? "delete_forever"
                                   : "delete_sweep"
@@ -587,7 +588,7 @@ PluginComponent {
                         onClicked: root.requestDismissRead()
                     }
 
-                    DankActionButton {
+                    DCommon.DActionButton {
                         iconName: "refresh"
                         buttonSize: 30
                         iconColor: root.isLoading
@@ -628,7 +629,7 @@ PluginComponent {
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
-                        DankActionButton {
+                        DCommon.DActionButton {
                             iconName: "select_all"
                             buttonSize: 26
                             iconColor: Theme.surfaceVariantText
@@ -636,7 +637,7 @@ PluginComponent {
                             onClicked: root.selectAllVisible()
                         }
 
-                        DankActionButton {
+                        DCommon.DActionButton {
                             iconName: "close"
                             buttonSize: 26
                             iconColor: Theme.surfaceVariantText
@@ -651,7 +652,7 @@ PluginComponent {
                         anchors.verticalCenter: parent.verticalCenter
                         spacing: 0
 
-                        DankActionButton {
+                        DCommon.DActionButton {
                             iconName: "done_all"
                             buttonSize: 26
                             iconColor: Theme.surfaceVariantText
@@ -659,7 +660,7 @@ PluginComponent {
                             onClicked: root.batchSetRead(true)
                         }
 
-                        DankActionButton {
+                        DCommon.DActionButton {
                             iconName: "mark_email_unread"
                             buttonSize: 26
                             iconColor: Theme.surfaceVariantText
@@ -667,7 +668,7 @@ PluginComponent {
                             onClicked: root.batchSetRead(false)
                         }
 
-                        DankActionButton {
+                        DCommon.DActionButton {
                             iconName: root.batchDismissArmed
                                       ? "delete_forever" : "delete"
                             buttonSize: 26
@@ -703,7 +704,7 @@ PluginComponent {
                     radius: Theme.cornerRadius
                     color: Theme.surfaceContainerHigh
 
-                    DankListView {
+                    DCommon.DListView {
                         id: topicList
                         anchors.fill: parent
                         anchors.margins: Theme.spacingXS
@@ -742,7 +743,7 @@ PluginComponent {
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
-                                DankIcon {
+                                DCommon.DIcon {
                                     visible: topicRow.modelData.value !== "__all__"
                                     name: "tag"
                                     size: Theme.iconSizeSmall
@@ -818,7 +819,7 @@ PluginComponent {
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
 
-                    DankListView {
+                    DCommon.DListView {
                         id: notificationList
                         anchors.fill: parent
                         clip: true
@@ -882,7 +883,7 @@ PluginComponent {
                                         height: 34
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        DankIcon {
+                                        DCommon.DIcon {
                                             anchors.centerIn: parent
                                             name: root.isSelected(
                                                       notificationCard.modelData.uid
@@ -917,7 +918,7 @@ PluginComponent {
                                         opacity: notificationCard.modelData.read ? 0.35 : 1
                                     }
 
-                                    DankIcon {
+                                    DCommon.DIcon {
                                         name: Ntfy.priorityIcon(
                                             notificationCard.modelData.priority
                                         )
@@ -1005,7 +1006,7 @@ PluginComponent {
                                         spacing: 0
                                         anchors.verticalCenter: parent.verticalCenter
 
-                                        DankActionButton {
+                                        DCommon.DActionButton {
                                             iconName: notificationCard.modelData.read
                                                       ? "mark_email_unread"
                                                       : "done"
@@ -1023,7 +1024,7 @@ PluginComponent {
                                             )
                                         }
 
-                                        DankActionButton {
+                                        DCommon.DActionButton {
                                             iconName:
                                                 root.pendingDismissUid
                                                 === notificationCard.modelData.uid
