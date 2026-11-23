@@ -48,7 +48,7 @@ archive later.
 
 ## Requirements
 
-- DankMaterialShell 1.5.0 or newer.
+- DankMaterialShell 2.0.0 or newer.
 - `curl`, `secret-tool` (libsecret), and GNU `base64` on `PATH`.
 - At least one ntfy topic with subscribe permission.
 
